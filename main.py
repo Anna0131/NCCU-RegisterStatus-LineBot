@@ -12,7 +12,7 @@ from selenium.common.exceptions import NoSuchElementException
 
 LINE_NOTIFY_TOKEN = 'YOUR_LINE_NOTIFY'
 
-# 已報到名單（初始化為空列表）
+# 已報到名單（初始化為空）
 reported_people = []
 
 def send_line_notify(message):
@@ -51,14 +51,14 @@ def fetch_report_status_with_dependencies():
         submit_button = driver.find_element(By.ID, "button")
         submit_button.click()
 
-        # 等待結果頁面加載
+        # 等待結果頁面載入
         WebDriverWait(driver, 10).until(
             EC.presence_of_element_located((By.ID, "Result_List"))
         )
 
-        # 抓取表格內容
+        # 抓 table 內容
         table = driver.find_element(By.XPATH, '//div[@id="Result_List"]/table')
-        rows = table.find_elements(By.TAG_NAME, "tr")[1:]  # 跳過表頭
+        rows = table.find_elements(By.TAG_NAME, "tr")[1:]  # 跳過 header
 
         report_results = []
         for row in rows:
@@ -95,7 +95,7 @@ def check_and_notify_new_reports():
         print(message)
         send_line_notify(message)
     else:
-        print("沒有新報到的同學or 系統備份中...已暫時關閉")
+        print("沒有新報到的同學 or 系統備份中故已暫時關閉")
 
 def monitor_report_status():
     """每 10 分鐘檢查一次報到狀況"""
@@ -121,11 +121,11 @@ def process_n_command():
 
 # 啟動程式
 if __name__ == "__main__":
-    # 啟動監控報到情況的執行緒
+    # 監控報到情況的 thread
     thread = threading.Thread(target=monitor_report_status)
     thread.start()
 
-    # 處理使用者指令
+    # 處理 user 指令
     while True:
         command = input("請輸入指令（例如 'N'）：").strip().lower()
         if command == "n":
