@@ -1,3 +1,4 @@
+
 import requests
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -8,11 +9,10 @@ from selenium.webdriver.support import expected_conditions as EC
 from webdriver_manager.firefox import GeckoDriverManager
 import time
 import threading
-from selenium.common.exceptions import NoSuchElementException
 
-LINE_NOTIFY_TOKEN = 'YOUR_LINE_NOTIFY'
+LINE_NOTIFY_TOKEN = 'JbyB0r9U8mA9Rz7dyfaTwJ2dTYy1lkaPDa7QyRgEw5C'
 
-# 已報到名單（初始化為空）
+# 已報到名單（初始化為空列表）
 reported_people = []
 
 def send_line_notify(message):
@@ -51,14 +51,14 @@ def fetch_report_status_with_dependencies():
         submit_button = driver.find_element(By.ID, "button")
         submit_button.click()
 
-        # 等待結果頁面載入
+        # 等待結果頁面加載
         WebDriverWait(driver, 10).until(
             EC.presence_of_element_located((By.ID, "Result_List"))
         )
 
-        # 抓 table 內容
+        # 抓取表格內容
         table = driver.find_element(By.XPATH, '//div[@id="Result_List"]/table')
-        rows = table.find_elements(By.TAG_NAME, "tr")[1:]  # 跳過 header
+        rows = table.find_elements(By.TAG_NAME, "tr")[1:]  # 跳過表頭
 
         report_results = []
         for row in rows:
@@ -78,24 +78,51 @@ def fetch_report_status_with_dependencies():
     finally:
         driver.quit()
 def check_and_notify_new_reports():
-    """檢查新報到的同學並整合通知到 LINE"""
+    """檢查新報到的同學，並通知包含所有已完成報到人員的統計"""
     global reported_people
     results = fetch_report_status_with_dependencies()
-    new_reports = [p for p in results if p['status'] == '報到' and p not in reported_people]
+    new_reports = [p for p in results if p['status'] == '報到' and p['name'] != '陳Ｏ璇' and p['name'] != '施Ｏ妤' and p not in reported_people]
 
     if new_reports:
         # 將新報到的同學加入已報到名單
         reported_people.extend(new_reports)
 
         # 整合通知訊息
-        message = "【政大報到狀況爬蟲】以下是最新完成報到的同學：\n"
-        for person in new_reports:
+        message = "\n最新報到情況如下：\n"
+
+        # 統計報到人數
+        eligible_people = [p for p in reported_people if "正取" in p['rank'] or "備取" in p['rank']]
+        reported_count = len(eligible_people)
+        max_students = 11  # 招生上限
+        message += f"\n總共 {reported_count} 人完成報到。\n"
+        if reported_count >= max_students:
+            message += "招生名額已滿！\n"
+        else:
+            message += "尚未滿額，仍有機會錄取。\n"
+
+
+        for person in reported_people:  # 包含所有已完成報到的同學
             message += f"{person['rank']} {person['name']} 已完成報到！\n"
+        
 
         print(message)
         send_line_notify(message)
     else:
-        print("沒有新報到的同學 or 系統備份中故已暫時關閉")
+        print("沒有新報到的同學，無需通知。")
+
+
+
+def process_now_command():
+    """處理 'now' 指令，傳送目前報到狀況到 LINE"""
+    global reported_people
+    if not reported_people:
+        message = "目前沒有已完成報到的同學。"
+    else:
+        message = "目前已完成報到的人員：\n"
+        for person in reported_people:
+            message += f"{person['rank']} {person['name']}\n"
+    print(message)
+    send_line_notify(message)
 
 def monitor_report_status():
     """每 10 分鐘檢查一次報到狀況"""
@@ -105,28 +132,14 @@ def monitor_report_status():
         print("等待 10 分鐘後再次檢查...")
         time.sleep(600)  # 每 10 分鐘檢查一次
 
-
-
-def process_n_command():
-    """處理 'N' 指令，傳送目前所有已完成報到的同學列表到 LINE"""
-    global reported_people
-    if not reported_people:
-        message = "目前沒有已完成報到的同學。"
-    else:
-        message = "目前已完成報到的人員：\n"
-        for person in reported_people:
-            message += f"{person['rank']} {person['name']}\n"
-    print(message)  # 在終端顯示
-    send_line_notify(message)
-
 # 啟動程式
 if __name__ == "__main__":
-    # 監控報到情況的 thread
+    # 啟動監控報到情況的執行緒
     thread = threading.Thread(target=monitor_report_status)
     thread.start()
 
-    # 處理 user 指令
+    # 處理使用者指令
     while True:
-        command = input("請輸入指令（例如 'N'）：").strip().lower()
-        if command == "n":
-            process_n_command()
+        command = input("請輸入指令（例如 'now'）：").strip().lower()
+        if command == "now":
+            process_now_command()
